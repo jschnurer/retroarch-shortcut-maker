@@ -1,0 +1,4 @@
+# Ignore the config file
+.retroarch-shortcut-maker.json
+package-lock.json
+node_modules/
