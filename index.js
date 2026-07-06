@@ -1,10 +1,9 @@
-import fs from "fs";
-import os from "os";
-import path from "path";
-import yargs from "yargs/yargs";
-import { hideBin } from "yargs/helpers";
-import readline from "readline";
 import child_process from "child_process";
+import fs from "fs";
+import path from "path";
+import readline from "readline";
+import { hideBin } from "yargs/helpers";
+import yargs from "yargs/yargs";
 
 const configPath = './.retroarch-shortcut-maker.json';
 
@@ -87,6 +86,80 @@ yargs(hideBin(process.argv))
 
       saveConfig(cfg);
       console.log(`Saved Desktop folder: ${cfg.desktopFolder}`);
+    }
+  )
+  .command(
+    ['set-dosbox <exePath>', 'sd <exePath>'],
+    'Set path to DosBox exe',
+    (y) => {
+      y.positional('exePath', {
+        describe: 'Path to dosbox exe',
+        type: 'string',
+      });
+    },
+    (argv) => {
+      const cfg = loadConfig();
+      cfg.dosBoxExe = path.resolve(argv.exePath);
+
+      if (!fs.existsSync(cfg.dosBoxExe)) {
+        console.error('Error: Specified path does not exist.');
+        process.exit(1);
+      }
+
+      try {
+        const stat = fs.statSync(cfg.dosBoxExe);
+        if (stat.isDirectory()) {
+          console.error('Error: Specified path is a directory.');
+          process.exit(1);
+        }
+      } catch (err) {
+        console.error('Error: Unable to access specified exe.');
+        process.exit(1);
+      }
+
+      saveConfig(cfg);
+      console.log(`Saved DosBox exe: ${cfg.dosBoxExe}`);
+    }
+  )
+  .command(
+    ["dosbox-shortcut [folder]", "dosbox [folder]", "d [folder]"],
+    "Create a shortcut for a folder to open in DosBox",
+    (y) => {
+      y.positional("folder", {
+        describe: "Path to folder (or zip file). (required)",
+        type: "string",
+        demandOption: true,
+      });
+    },
+    (argv) => {
+      const cfg = loadConfig();
+      const db = cfg.dosBoxExe || "(not set)";
+
+      if (db === '(not set)') {
+        console.error('Error: DosBoxExe is not set. Use the set-dosbox command first.');
+        process.exit(1);
+      }
+
+      const tgt = argv.folder;
+
+      const stats = fs.statSync(tgt);
+
+      let shortcutName;
+      if (stats.isDirectory()) {
+        // If it's a folder, get the folder name
+        shortcutName = path.basename(tgt);
+      } else {
+        // If it's a file, get the name without the extension
+        shortcutName = path.basename(tgt, path.extname(tgt));
+      }
+
+      // Create the DOSBox shortcut.
+      const outputPath = path.join(cfg.desktopFolder, shortcutName + ".lnk");
+
+      const shortcutTarget = `"${db}" "${tgt}"`;
+
+      // Create the shortcut file (Windows .lnk format)
+      createShortcutFile(outputPath, shortcutTarget);
     }
   )
   .command(
